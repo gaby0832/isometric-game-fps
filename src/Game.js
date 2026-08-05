@@ -124,6 +124,18 @@ export class Game {
 
         this.clock = new THREE.Clock();
 
+        this.raycaster = new THREE.Raycaster();
+		this.mouse = new THREE.Vector2();
+
+		// Plano infinito na altura Y = 0
+		this.groundPlane = new THREE.Plane(
+		    new THREE.Vector3(0, 1, 0),
+		    0
+		);
+
+		// Vetor reutilizado para guardar onde o mouse bate no plano
+		this.mousePoint = new THREE.Vector3();
+
 
         this.loader = new FBXLoader();
 
@@ -164,6 +176,11 @@ export class Game {
 
 		});
 
+
+		this.forward = new THREE.Vector3();
+this.right = new THREE.Vector3();
+this.up = new THREE.Vector3(0, 1, 0);
+
     }
 
     start() {
@@ -193,141 +210,85 @@ export class Game {
 
     loop = () => {
 
-    	if (!this.player) {
+    requestAnimationFrame(this.loop);
 
-		    requestAnimationFrame(this.loop);
-		    this.renderer.render(this.scene, this.camera);
-		    return;
-
-		}
-
-    	const delta = this.clock.getDelta();
-
-		if (this.mixer)
-		    this.mixer.update(delta);
-
-    	const speed = 0.08;
-
-		const forward = new THREE.Vector3();
-
-		// pega a direção para frente do jogador
-		this.player.getWorldDirection(forward);
-
-		// como não queremos subir/descer
-		forward.y = 0;
-
-		// normaliza para ficar com tamanho 1
-		forward.normalize();
-
-		// vetor para direita
-		const right = new THREE.Vector3();
-		const up = new THREE.Vector3(0, 1, 0);
-		right.crossVectors(up, forward).normalize();
-		let moving = false;
-
-
-		// W
-		if (this.keys["KeyW"]) {
-			 moving = true;
-		    this.player.position.addScaledVector(forward, speed);
-		  
-
-		     if (this.keys["KeyA"]) {
-		     	 this.play("fleft");
-
-		     }else if(this.keys["KeyD"]){
-		     	this.play("fright");
-		     }else{
-		     	this.play("front");
-		     }
-		}
-
-		// S
-		if (this.keys["KeyS"]) {
-			 moving = true;
-		    this.player.position.addScaledVector(forward, -speed);
-		     
-		     if (this.keys["KeyA"]) {
-		     	 this.play("bleft");
-
-		     }else if(this.keys["KeyD"]){
-		     	this.play("bright");
-		     }else{
-		     	this.play("back");
-		     }
-		}
-
-		// A
-		if (this.keys["KeyA"]) {
-			 moving = true;
-		    this.player.position.addScaledVector(right, speed);
-		   
-
-		          if (this.keys["KeyW"]) {
-		     	 this.play("fleft");
-
-		     }else if(this.keys["KeyS"]){
-		     	this.play("bleft");
-		     }else{
-		     	  this.play("right");
-		     }
-		}
-
-
-		// D
-		if (this.keys["KeyD"]) {
-			 moving = true;
-		    this.player.position.addScaledVector(right, -speed);
-		     
-
-		     if (this.keys["KeyW"]) {
-		     	 this.play("fright");
-
-		     }else if(this.keys["KeyS"]){
-		     	this.play("bright");
-		     }else{
-		     	this.play("left");
-		     }
-		}
-
-		if (!moving) {
-		    this.play("idle");
-		}
-
-		this.camera.position.x = this.player.position.x + 15;
-
-
-		this.camera.position.z = this.player.position.z + 15;
-
-		this.camera.lookAt(
-		    this.player.position.x,
-		    this.player.position.y,
-		    this.player.position.z
-		);
-
-		this.camera.updateMatrixWorld();
-
-		this.raycaster.setFromCamera(this.mouse, this.camera);
-
-		const hits = this.raycaster.intersectObject(this.floor);
-
-		if (hits.length > 0) {
-
-		    const point = hits[0].point;
-
-		    const dx = point.x - this.player.position.x;
-		    const dz = point.z - this.player.position.z;
-
-		    this.player.rotation.y = Math.atan2(dx, dz);
-
-		}
-
-
-	
-
-
-        requestAnimationFrame(this.loop);
-
+    if (!this.player) {
         this.renderer.render(this.scene, this.camera);
-    };
+        return;
+    }
+
+    const delta = this.clock.getDelta();
+
+    if (this.mixer)
+        this.mixer.update(delta);
+
+    const speed = 0.08;
+
+    // Vetores
+    this.player.getWorldDirection(this.forward);
+
+	this.forward.y = 0;
+	this.forward.normalize();
+
+	this.right.crossVectors(this.up, this.forward).normalize();
+
+    // Movimento
+    const W = this.keys["KeyW"];
+    const A = this.keys["KeyA"];
+    const S = this.keys["KeyS"];
+    const D = this.keys["KeyD"];
+
+    if (W) this.player.position.addScaledVector(this.forward, speed);
+    if (S) this.player.position.addScaledVector(this.forward, -speed);
+    if (A) this.player.position.addScaledVector(this.right, speed);
+    if (D) this.player.position.addScaledVector(this.right, -speed);
+
+    // Escolhe UMA animação
+    let animation = "idle";
+
+    if (W && A)
+        animation = "fleft";
+    else if (W && D)
+        animation = "fright";
+    else if (S && A)
+        animation = "bleft";
+    else if (S && D)
+        animation = "bright";
+    else if (W)
+        animation = "front";
+    else if (S)
+        animation = "back";
+    else if (A)
+        animation = "right";
+    else if (D)
+        animation = "left";
+
+    this.play(animation);
+
+    // Câmera
+    this.camera.position.set(
+        this.player.position.x + 15,
+        15,
+        this.player.position.z + 15
+    );
+
+    this.camera.lookAt(this.player.position);
+
+    this.camera.updateMatrixWorld();
+
+    // Mouse
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    if (this.raycaster.ray.intersectPlane(this.groundPlane, this.mousePoint)) {
+
+	    const dx = this.mousePoint.x - this.player.position.x;
+	    const dz = this.mousePoint.z - this.player.position.z;
+
+	    this.player.rotation.y = Math.atan2(dx, dz);
+
+	}
+
+    this.renderer.render(this.scene, this.camera);
+
+};
 }
