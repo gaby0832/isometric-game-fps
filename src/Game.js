@@ -3,12 +3,30 @@ import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
 export class Game {
 
+		assetLoaded() {
+
+    this.assetsLoaded++;
+
+    console.log(`${this.assetsLoaded}/${this.assetsToLoad}`);
+
+    if (this.assetsLoaded === this.assetsToLoad) {
+
+        this.gameReady = true;
+
+        console.log("Tudo carregado!");
+
+    }
+
+}
+
 	loadAnimations() {
 
 	    this.loader.load("/front.fbx", (anim) => {
 
 	        this.actions.front =
 	            this.mixer.clipAction(anim.animations[0]);
+
+	            this.assetLoaded();
 
 	    });
 
@@ -17,12 +35,16 @@ export class Game {
 	        this.actions.back =
 	            this.mixer.clipAction(anim.animations[0]);
 
+	            this.assetLoaded();
+
 	    });
 
 	    this.loader.load("/left.fbx", (anim) => {
 
 	        this.actions.left =
 	            this.mixer.clipAction(anim.animations[0]);
+
+	            this.assetLoaded();
 
 	    });
 
@@ -31,12 +53,16 @@ export class Game {
 	        this.actions.right =
 	            this.mixer.clipAction(anim.animations[0]);
 
+	            this.assetLoaded();
+
 	    });
 
 	    this.loader.load("/fleft.fbx", (anim) => {
 
 	        this.actions.fleft =
 	            this.mixer.clipAction(anim.animations[0]);
+
+	            this.assetLoaded();
 
 	    });
 
@@ -45,6 +71,8 @@ export class Game {
 	        this.actions.fright =
 	            this.mixer.clipAction(anim.animations[0]);
 
+	            this.assetLoaded();
+
 	    });
 
 	    this.loader.load("/bleft.fbx", (anim) => {
@@ -52,12 +80,16 @@ export class Game {
 	        this.actions.bleft =
 	            this.mixer.clipAction(anim.animations[0]);
 
+	            this.assetLoaded();
+
 	    });
 
 	    this.loader.load("/bright.fbx", (anim) => {
 
 	        this.actions.bright =
 	            this.mixer.clipAction(anim.animations[0]);
+
+	            this.assetLoaded();
 
 	    });
 
@@ -69,12 +101,17 @@ export class Game {
 
 		    this.actions.idle = this.mixer.clipAction(anim.animations[0]);
 
+		    this.assetLoaded();
+
 		    // Começa parado
 		    this.play("idle");
 
 		});
 
 	}
+
+
+
 
 
     constructor() {
@@ -139,6 +176,10 @@ export class Game {
 
         this.loader = new FBXLoader();
 
+		        this.assetsToLoad = 10; // player + 9 animações
+		this.assetsLoaded = 0;
+		this.gameReady = false;
+
 		this.mixer = null;
 		this.actions = {};
 		this.currentAction = null;
@@ -150,6 +191,9 @@ export class Game {
 		    this.player.scale.setScalar(0.02);
 
 		    this.scene.add(this.player);
+
+
+			this.assetLoaded();
 
 		    this.mixer = new THREE.AnimationMixer(this.player);
 
@@ -177,9 +221,25 @@ export class Game {
 		});
 
 
+this.deadZone = 4; // distância em unidades do mundo
+
+/*this.deadZoneMesh = new THREE.Mesh(
+    new THREE.RingGeometry(this.deadZone - 0.05, this.deadZone, 64),
+    new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        side: THREE.DoubleSide
+    })
+);
+
+this.deadZoneMesh.rotation.x = -Math.PI / 2;
+this.scene.add(this.deadZoneMesh);
+this.deadZoneMesh.position.y = 0.1;
+*/
+
 		this.forward = new THREE.Vector3();
 this.right = new THREE.Vector3();
 this.up = new THREE.Vector3(0, 1, 0);
+
 
     }
 
@@ -210,6 +270,16 @@ this.up = new THREE.Vector3(0, 1, 0);
 
     loop = () => {
 
+    	if (!this.gameReady) {
+
+	    requestAnimationFrame(this.loop);
+
+	    this.renderer.render(this.scene, this.camera);
+
+	    return;
+
+	}
+
     requestAnimationFrame(this.loop);
 
     if (!this.player) {
@@ -226,6 +296,8 @@ this.up = new THREE.Vector3(0, 1, 0);
 
     // Vetores
     this.player.getWorldDirection(this.forward);
+    //this.deadZoneMesh.position.copy(this.player.position);
+    //this.deadZoneMesh.position.y = 0.1;
 
 	this.forward.y = 0;
 	this.forward.normalize();
@@ -281,12 +353,26 @@ this.up = new THREE.Vector3(0, 1, 0);
 
     if (this.raycaster.ray.intersectPlane(this.groundPlane, this.mousePoint)) {
 
-	    const dx = this.mousePoint.x - this.player.position.x;
-	    const dz = this.mousePoint.z - this.player.position.z;
+				const dx = this.mousePoint.x - this.player.position.x;
+		const dz = this.mousePoint.z - this.player.position.z;
 
-	    this.player.rotation.y = Math.atan2(dx, dz);
+		const distance = Math.sqrt(dx * dx + dz * dz);
 
+		if (distance < this.deadZone) {
+
+		    const scale = this.deadZone / distance;
+
+		    this.mousePoint.x = this.player.position.x + dx * scale;
+		    this.mousePoint.z = this.player.position.z + dz * scale;
+
+		}
+
+		this.player.rotation.y = Math.atan2(
+		    this.mousePoint.x - this.player.position.x,
+		    this.mousePoint.z - this.player.position.z
+		);
 	}
+
 
     this.renderer.render(this.scene, this.camera);
 
